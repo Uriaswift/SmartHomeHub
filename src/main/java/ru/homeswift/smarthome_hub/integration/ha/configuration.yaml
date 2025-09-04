@@ -18,3 +18,13 @@ mqtt:
 # Красивые имена сущностей (не обязательно)
 homeassistant:
   name: Smart Home
+
+light:
+  - platform: mqtt
+    name: "TV Backlight"
+    state_topic: "homeassistant/light/tv_backlight/state"
+    command_topic: "homeassistant/light/tv_backlight/set"
+    payload_on: "ON"
+    payload_off: "OFF"
+    qos: 1
+    retain: true

@@ -38,3 +38,6 @@ smh:
   auth:
     user: admin
     password: admin123
+
+govee:
+  api_key: "a029d791-d2d5-4729-9d67-6d95d273114a"
