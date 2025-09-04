@@ -1,0 +1,280 @@
+<!doctype html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>SmartHomeHub — Панель устройств</title>
+    <style>
+        :root { --bg:#0f172a; --card:#111827; --muted:#94a3b8; --txt:#e5e7eb; --accent:#2563eb; --danger:#ef4444; --ok:#22c55e; }
+        html,body{margin:0;background:var(--bg);color:var(--txt);font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,"Helvetica Neue",Arial,"Noto Sans","Apple Color Emoji","Segoe UI Emoji";}
+        .container{max-width:1100px;margin:24px auto;padding:0 16px;}
+        .row{display:flex;gap:16px;flex-wrap:wrap;}
+        .card{background:var(--card);border-radius:16px;padding:16px;box-shadow:0 8px 30px rgba(0,0,0,.25);}
+        h1{font-size:22px;margin:0 0 16px;}
+        h2{font-size:18px;margin:0 0 12px;}
+        .muted{color:var(--muted)}
+        .grid{display:grid;gap:12px;}
+        .grid.cols-2{grid-template-columns:1fr 1fr}
+        label{font-size:12px;color:var(--muted)}
+        input,select{width:100%;padding:10px 12px;border-radius:10px;border:1px solid #1f2937;background:#0b1220;color:var(--txt);outline:none}
+        input::placeholder{color:#475569}
+        .btn{cursor:pointer;border:0;border-radius:12px;padding:10px 14px;transition:.15s background,.15s opacity}
+        .btn:disabled{opacity:.5;cursor:default}
+        .btn-primary{background:var(--accent);color:white}
+        .btn-ghost{background:transparent;color:var(--txt);border:1px solid #334155}
+        .btn-danger{background:var(--danger);color:white}
+        .btn-ok{background:var(--ok);color:black}
+        table{width:100%;border-collapse:collapse}
+        th,td{padding:10px;border-bottom:1px solid #1f2937;text-align:left;font-size:14px}
+        .chip{display:inline-flex;align-items:center;gap:6px;padding:4px 8px;border-radius:999px;font-size:12px;border:1px solid #334155}
+        .switch{appearance:none;width:42px;height:24px;border-radius:999px;background:#334155;position:relative;outline:none;cursor:pointer;vertical-align:middle}
+        .switch:checked{background:var(--ok)}
+        .switch:before{content:"";position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;background:white;transition:.15s left}
+        .switch:checked:before{left:21px}
+        .toolbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+        .right{margin-left:auto}
+        .pill{border:1px solid #334155;padding:6px 10px;border-radius:999px}
+        .error{color:#fecaca}
+        .ok{color:#bbf7d0}
+        .kbd{font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono","Courier New",monospace}
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="row">
+        <div class="card" style="flex:1 1 320px">
+            <h1>SmartHomeHub — Панель устройств</h1>
+            <div class="muted">
+                Базовая панель для добавления, редактирования, удаления и переключения устройств.
+                Работает поверх REST API (<span class="kbd">/api/devices</span>).
+            </div>
+            <div id="auth" class="toolbar" style="margin-top:12px">
+                <input id="user" placeholder="Логин (по умолчанию admin)" style="max-width:220px">
+                <input id="pass" placeholder="Пароль (по умолчанию admin)" type="password" style="max-width:220px">
+                <button class="btn btn-ghost" onclick="saveAuth()">Сохранить доступ</button>
+                <span class="muted">Браузер сохранит токен в <span class="kbd">localStorage</span>.</span>
+                <span class="right"></span>
+                <button class="btn btn-ghost" onclick="clearAuth()">Сбросить доступ</button>
+            </div>
+        </div>
+
+        <div class="card" style="flex:1 1 380px">
+            <h2>Добавить устройство</h2>
+            <div class="grid cols-2">
+                <div>
+                    <label>Имя</label>
+                    <input id="f_name" placeholder="Kitchen Light">
+                </div>
+                <div>
+                    <label>Тип</label>
+                    <select id="f_type">
+                        <option value="LIGHT" selected>LIGHT</option>
+                        <option value="SWITCH">SWITCH</option>
+                        <option value="SENSOR">SENSOR</option>
+                        <option value="DIMMER">DIMMER</option>
+                    </select>
+                </div>
+                <div class="grid" style="grid-column:1/-1">
+                    <label>MQTT Topic</label>
+                    <input id="f_topic" placeholder="smarthome/devices/kitchen/light1">
+                </div>
+                <div>
+                    <label>Online</label><br/>
+                    <input id="f_online" type="checkbox" class="switch" checked>
+                </div>
+                <div>
+                    <label>Включено (onState)</label><br/>
+                    <input id="f_on" type="checkbox" class="switch">
+                </div>
+            </div>
+            <div class="toolbar" style="margin-top:12px">
+                <button class="btn btn-primary" onclick="createDevice()">Добавить</button>
+                <div id="create_status" class="muted"></div>
+                <span class="right"></span>
+                <button class="btn btn-ghost" onclick="prefill()">Пример</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="card" style="margin-top:16px">
+        <div class="toolbar">
+            <h2 style="margin:0">Устройства</h2>
+            <span class="right"></span>
+            <button class="btn btn-ghost" onclick="loadDevices()">Обновить</button>
+        </div>
+        <div id="list_status" class="muted" style="margin-top:6px"></div>
+        <div style="overflow:auto;margin-top:8px">
+            <table id="tbl">
+                <thead>
+                <tr>
+                    <th>ID</th><th>Имя</th><th>Тип</th><th>Топик</th><th>Online</th><th>Состояние</th><th>Действия</th>
+                </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="muted" style="margin-top:12px">
+        Подсказка: при 401 браузер может запросить Basic-логин/пароль. Если в <span class="kbd">application.yml</span> стоит
+        <span class="kbd">spring.security.user.name=admin</span> / <span class="kbd">password=admin</span> — используйте их.
+    </div>
+</div>
+
+<script>
+    // ===== AUTH =====
+    const LS_KEY = 'smh_auth';
+    function getAuth() {
+      try { return JSON.parse(localStorage.getItem(LS_KEY)||'{}'); } catch { return {}; }
+    }
+    function setAuth(a) { localStorage.setItem(LS_KEY, JSON.stringify(a||{})); }
+    function clearAuth() { localStorage.removeItem(LS_KEY); alert('Сброшены сохранённые учетные данные'); }
+    function saveAuth() {
+      const u = document.getElementById('user').value || 'admin';
+      const p = document.getElementById('pass').value || 'admin';
+      setAuth({u,p});
+      alert('Сохранено. Теперь запросы будут отправляться с Basic-Auth.');
+    }
+    function authHeader() {
+      const {u,p} = getAuth();
+      if (!u || !p) return {};
+      return { 'Authorization': 'Basic ' + btoa(u + ':' + p) };
+    }
+
+    // ===== API helpers =====
+    async function api(path, opt={}) {
+      const resp = await fetch(path, {
+        ...opt,
+        headers: {
+          'Accept': 'application/json',
+          ...(opt.body ? {'Content-Type': 'application/json'} : {}),
+          ...authHeader(),
+          ...(opt.headers||{})
+        },
+        credentials: 'same-origin'
+      });
+      if (!resp.ok) {
+        let text = await resp.text().catch(()=> '');
+        throw new Error(`HTTP ${resp.status}: ${text||resp.statusText}`);
+      }
+      const ct = resp.headers.get('content-type') || '';
+      return ct.includes('application/json') ? resp.json() : resp.text();
+    }
+
+    // ===== UI actions =====
+    function prefill() {
+      document.getElementById('f_name').value = 'Kitchen Light';
+      document.getElementById('f_type').value = 'LIGHT';
+      document.getElementById('f_topic').value = 'smarthome/devices/kitchen/light1';
+      document.getElementById('f_online').checked = true;
+      document.getElementById('f_on').checked = false;
+    }
+
+    async function loadDevices() {
+      const s = document.getElementById('list_status'); s.textContent = 'Загрузка...';
+      try {
+        const data = await api('/api/devices');
+        renderTable(data || []);
+        s.textContent = `Найдено: ${data.length}`;
+      } catch (e) {
+        s.innerHTML = `<span class="error">${e.message}</span>`;
+      }
+    }
+
+    function renderTable(items) {
+      const tb = document.querySelector('#tbl tbody');
+      tb.innerHTML = '';
+      for (const d of items) {
+        const tr = document.createElement('tr');
+
+        tr.innerHTML = `
+          <td>${d.id}</td>
+          <td>${escapeHtml(d.name)}</td>
+          <td><span class="chip">${escapeHtml(d.type)}</span></td>
+          <td><span class="pill kbd">${escapeHtml(d.topic)}</span></td>
+          <td><input type="checkbox" ${d.online ? 'checked' : ''} class="switch" data-act="online"></td>
+          <td><input type="checkbox" ${d.onState ? 'checked' : ''} class="switch" data-act="on"></td>
+          <td class="toolbar">
+              <button class="btn btn-ghost" data-act="toggle">Toggle</button>
+              <button class="btn btn-ghost" data-act="edit">Редакт.</button>
+              <button class="btn btn-danger" data-act="del">Удалить</button>
+          </td>
+        `;
+
+        // handlers
+        tr.querySelector('[data-act="toggle"]').onclick = () => toggleDevice(d.id);
+        tr.querySelector('[data-act="del"]').onclick = () => delDevice(d.id);
+        tr.querySelector('[data-act="edit"]').onclick = () => editDevicePrompt(d);
+        tr.querySelector('[data-act="online"]').onchange = (ev) => patchDevice(d.id, { online: ev.target.checked });
+        tr.querySelector('[data-act="on"]').onchange = (ev) => setState(d.id, ev.target.checked);
+
+        tb.appendChild(tr);
+      }
+    }
+
+    async function createDevice() {
+      const name  = document.getElementById('f_name').value.trim();
+      const type  = document.getElementById('f_type').value;
+      const topic = document.getElementById('f_topic').value.trim();
+      const online= document.getElementById('f_online').checked;
+      const on    = document.getElementById('f_on').checked;
+      const st = document.getElementById('create_status');
+
+      if (!name || !topic) { st.innerHTML = '<span class="error">Заполни имя и топик</span>'; return; }
+      st.textContent = 'Отправка...';
+
+      try {
+        await api('/api/devices', { method:'POST', body: JSON.stringify({ name, type, topic, online, onState: on }) });
+        st.innerHTML = '<span class="ok">Создано</span>';
+        loadDevices();
+      } catch (e) {
+        st.innerHTML = `<span class="error">${e.message}</span>`;
+      }
+    }
+
+    async function toggleDevice(id) {
+      try { await api(`/api/devices/${id}/toggle`, { method:'POST' }); loadDevices(); }
+      catch (e) { alert(e.message); }
+    }
+
+    async function setState(id, on) {
+      try { await api(`/api/devices/${id}/state?on=${on}`, { method:'POST' }); }
+      catch (e) { alert(e.message); loadDevices(); }
+    }
+
+    async function patchDevice(id, part) {
+      // забираем текущую модель — просто для простоты редактирования
+      try {
+        const d = await api(`/api/devices/${id}`);
+        const merged = { ...d, ...part };
+        await api(`/api/devices/${id}`, { method:'PUT', body: JSON.stringify(merged) });
+      } catch (e) { alert(e.message); loadDevices(); }
+    }
+
+    async function delDevice(id) {
+      if (!confirm('Удалить устройство #' + id + '?')) return;
+      try { await api(`/api/devices/${id}`, { method:'DELETE' }); loadDevices(); }
+      catch (e) { alert(e.message); }
+    }
+
+    function editDevicePrompt(d) {
+      const name = prompt('Имя', d.name); if (name == null) return;
+      const topic= prompt('MQTT Topic', d.topic); if (topic == null) return;
+      const type = prompt('Тип (LIGHT/SWITCH/SENSOR/DIMMER)', d.type || 'LIGHT'); if (type == null) return;
+      patchDevice(d.id, { name, topic, type });
+    }
+
+    function escapeHtml(s) {
+      return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+    }
+
+    // init
+    (function init() {
+      const a = getAuth();
+      if (a.u) document.getElementById('user').value = a.u;
+      if (a.p) document.getElementById('pass').value = a.p;
+      loadDevices();
+    })();
+</script>
+</body>
+</html>

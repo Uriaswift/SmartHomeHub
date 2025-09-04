@@ -1,0 +1,85 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: smh-postgres
+    environment:
+      POSTGRES_DB: smarthome
+      POSTGRES_USER: smarthome
+      POSTGRES_PASSWORD: smarthome
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U smarthome -d smarthome"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7-alpine
+    container_name: smh-redis
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 2s
+      retries: 20
+
+  mosquitto:
+    image: eclipse-mosquitto:2
+    container_name: smh-mosquitto
+    ports:
+      - "1883:1883"
+    volumes:
+      - ./mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+    healthcheck:
+      # ВАЖНО: экранируем $ как $$ и добавляем ожидание -W 5
+      test: ["CMD-SHELL", "mosquitto_sub -h localhost -t '$$SYS/#' -C 1 -W 5 || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  homeassistant:
+    image: ghcr.io/home-assistant/home-assistant:stable
+    container_name: smh-homeassistant
+    depends_on:
+      - mosquitto
+    volumes:
+      - ./ha_config:/config
+      - /etc/localtime:/etc/localtime:ro
+    environment:
+      - TZ=Europe/Moscow
+    ports:
+      - "8123:8123"
+    restart: unless-stopped
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: smarthomehub-app
+    container_name: smh-app
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      mosquitto:
+        condition: service_healthy
+    environment:
+      SERVER_PORT: 8080
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/smarthome
+      SPRING_DATASOURCE_USERNAME: smarthome
+      SPRING_DATASOURCE_PASSWORD: smarthome
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PORT: 6379
+      MQTT_BROKER_URL: tcp://mosquitto:1883
+      MQTT_CLIENT_ID: smarthome-hub-backend
+    ports:
+      - "8080:8080"
+    restart: unless-stopped
+
+volumes:
+  pgdata:

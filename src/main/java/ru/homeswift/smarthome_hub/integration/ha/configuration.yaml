@@ -1,0 +1,20 @@
+# ha_config/configuration.yaml
+default_config:
+
+# ВКЛ. панель разработчика, логгер, шаблоны — полезно при отладке
+logger:
+  default: info
+
+# MQTT интеграция. В docker-compose все сервисы в одной сети,
+# поэтому брокер — по имени сервиса "mosquitto".
+mqtt:
+  broker: mosquitto
+  port: 1883
+  username: ""
+  password: ""
+  discovery: true
+  discovery_prefix: homeassistant  # именно так публикуем из Java
+
+# Красивые имена сущностей (не обязательно)
+homeassistant:
+  name: Smart Home

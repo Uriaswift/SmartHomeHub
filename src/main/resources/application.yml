@@ -1,0 +1,40 @@
+server:
+  port: ${SERVER_PORT:8080}
+
+spring:
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://postgres:5432/smarthome}
+    username: ${SPRING_DATASOURCE_USERNAME:smarthome}
+    password: ${SPRING_DATASOURCE_PASSWORD:smarthome}
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+
+  data:
+    redis:
+      host: ${SPRING_DATA_REDIS_HOST:redis}
+      port: ${SPRING_DATA_REDIS_PORT:6379}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+
+mqtt:
+  broker-url: ${MQTT_BROKER_URL:tcp://mosquitto:1883}
+  client-id: ${MQTT_CLIENT_ID:smarthome-hub-backend}
+  default-topic: smarthome/devices/events
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+
+smh:
+  auth:
+    user: admin
+    password: admin123
